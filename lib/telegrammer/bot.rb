@@ -1,3 +1,4 @@
+require 'tempfile'
 module Telegrammer
   # Wrapper for the Telegram's Bots API
   class Bot
@@ -422,6 +423,35 @@ module Telegrammer
       response = api_request('getUserProfilePhotos', params, params_validation)
 
       Telegrammer::DataTypes::UserProfilePhotos.new(response.result)
+    end
+
+    def get_file(params)
+      params_validation = { file_id: { required: true, class: [String] } }
+
+      response = api_request('getFile', params, params_validation)
+
+      Telegrammer::DataTypes::File.new(response.result)
+    end
+
+    def download(file)
+      api_uri = "file/bot#{@api_token}/#{file.file_path}"
+      begin
+      	response = @connection.get(
+          "#{API_ENDPOINT}/#{api_uri}", {
+            'User-Agent' => "Telegrammer/#{Telegrammer::VERSION}",
+            'Accept' => 'application/json'
+          }
+        )
+
+        temp_file = Tempfile.new(file.file_path.split('/').last)
+        temp_file.binmode
+        temp_file.write(response.body)
+        temp_file
+      rescue HTTPClient::ReceiveTimeoutError => e
+      	if !@fail_silently
+          fail Telegrammer::Errors::TimeoutError, e.to_s
+        end
+      end
     end
 
     private
